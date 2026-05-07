@@ -58,31 +58,7 @@
   #syncStatus.offline #syncDot  { background: #aaa; }
   @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
 
-  /* SETUP BANNER */
-  #setupBanner {
-    background: linear-gradient(135deg, #e8734a, #c96b9e);
-    color: #fff;
-    padding: 1rem 2rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 1rem;
-    flex-wrap: wrap;
-  }
-  #setupBanner p { font-size: 0.9rem; opacity: 0.95; }
-  #setupBanner strong { font-size: 1rem; }
-  #setupBanner a {
-    background: rgba(255,255,255,0.25);
-    border: 1px solid rgba(255,255,255,0.5);
-    color: #fff;
-    text-decoration: none;
-    padding: 0.4rem 1rem;
-    border-radius: 8px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    white-space: nowrap;
-  }
-  #setupBanner a:hover { background: rgba(255,255,255,0.35); }
+
 
   /* HEADER */
   header {
@@ -497,15 +473,6 @@
 <div id="loadingOverlay">
   <div class="spinner"></div>
   <p>Connecting to your planner…</p>
-</div>
-
-<!-- ⚠️ SETUP BANNER — remove this div after you've configured Firebase -->
-<div id="setupBanner">
-  <div>
-    <strong>⚙️ Firebase Setup Required</strong>
-    <p>Replace the Firebase config below with your own project config. <a href="#" onclick="document.getElementById('setupBanner').style.display='none';return false">Hide this</a></p>
-  </div>
-  <a href="https://console.firebase.google.com/" target="_blank">Open Firebase Console →</a>
 </div>
 
 <header>
