@@ -305,6 +305,54 @@
   }
   .add-event-btn:hover { color: var(--accent1); }
 
+  /* AUTO-ENTRY chips (tasks/homework/projects/tests shown on schedule) */
+  .auto-chip {
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    border-left: 3px solid currentColor;
+    opacity: 0.92;
+  }
+  .auto-chip-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    opacity: 0.65;
+    display: block;
+    margin-bottom: 0.1rem;
+  }
+  .auto-chip-name {
+    display: block;
+    font-size: 0.8rem;
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 130px;
+  }
+  .auto-chip-due {
+    font-size: 0.68rem;
+    opacity: 0.6;
+    display: block;
+    margin-top: 0.1rem;
+  }
+  .auto-task    { background: #eef7ec; color: #2e7d32; }
+  .auto-homework{ background: #e8f4f8; color: #1565c0; }
+  .auto-project { background: #fce8f3; color: #880e4f; }
+  .auto-test    { background: #f0ebfa; color: #4a148c; }
+  .schedule-divider {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 0.25rem 0.2rem 0;
+    margin-top: 0.2rem;
+    border-top: 1px dashed var(--border);
+  }
+
   /* TASKS */
   .tasks-list { display: flex; flex-direction: column; gap: 0.7rem; }
   .task-item {
@@ -674,12 +722,42 @@ function renderAll() {
   renderCards('tests', 'testsGrid');
 }
 
+// Map a due date string to the weekday name (Mon-Fri), or null if weekend/no date
+function dueDateToDay(dateStr) {
+  if (!dateStr) return null;
+  const d = new Date(dateStr + 'T00:00:00');
+  const dow = d.getDay(); // 0=Sun,1=Mon...5=Fri,6=Sat
+  if (dow < 1 || dow > 5) return null;
+  return DAYS[dow - 1];
+}
+
+// Build auto-entry chips for a given day from tasks/homework/projects/tests
+function getAutoEntries(day) {
+  const entries = [];
+  const typeMap = [
+    { key: 'tasks',    label: 'Task',     cls: 'auto-task' },
+    { key: 'homework', label: 'Homework', cls: 'auto-homework' },
+    { key: 'projects', label: 'Project',  cls: 'auto-project' },
+    { key: 'tests',    label: 'Test/Quiz',cls: 'auto-test' },
+  ];
+  typeMap.forEach(({ key, label, cls }) => {
+    (data[key] || []).forEach(item => {
+      if (dueDateToDay(item.dueDate) === day) {
+        entries.push({ item, label, cls });
+      }
+    });
+  });
+  return entries;
+}
+
 function renderSchedule() {
   const grid = document.getElementById('weekGrid');
   const todayDay = getTodayDay();
   grid.innerHTML = DAYS.map((day, i) => {
     const events = data.schedule.filter(e => e.day === day).sort((a,b) => a.time.localeCompare(b.time));
+    const autoEntries = getAutoEntries(day);
     const isToday = day === todayDay;
+    const hasAnything = events.length || autoEntries.length;
     return `
       <div class="day-col ${isToday ? 'day-today' : ''}">
         <div class="day-header" style="${isToday ? '' : 'background:#f8f4f1;'}">
@@ -695,7 +773,18 @@ function renderSchedule() {
                 onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0"
                 onclick="deleteItem('schedule','${e.id}')">✕</button>
             </div>
-          `).join('') : '<p style="font-size:0.78rem;color:#bbb;padding:0.3rem 0.2rem">Nothing yet</p>'}
+          `).join('') : ''}
+          ${autoEntries.length ? `
+            ${events.length ? '<div class="schedule-divider">Due</div>' : ''}
+            ${autoEntries.map(({ item, label, cls }) => `
+              <div class="auto-chip ${cls}">
+                <span class="auto-chip-label">${label}</span>
+                <span class="auto-chip-name">${esc(item.name)}</span>
+                ${item.subject ? `<span class="auto-chip-due">${esc(item.subject)}</span>` : ''}
+              </div>
+            `).join('')}
+          ` : ''}
+          ${!hasAnything ? '<p style="font-size:0.78rem;color:#bbb;padding:0.3rem 0.2rem">Nothing yet</p>' : ''}
         </div>
         <button class="add-event-btn" onclick="openModalForDay('${day}')">+ Add</button>
       </div>
