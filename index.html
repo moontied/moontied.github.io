@@ -27,6 +27,63 @@
     min-height: 100vh;
   }
 
+  /* SYNC STATUS */
+  #syncStatus {
+    position: fixed;
+    bottom: 1.2rem;
+    right: 1.2rem;
+    background: var(--card);
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.78rem;
+    font-weight: 500;
+    color: var(--muted);
+    box-shadow: 0 4px 16px var(--shadow);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    z-index: 200;
+    transition: all 0.3s;
+  }
+  #syncDot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: #ccc;
+    transition: background 0.3s;
+  }
+  #syncStatus.synced #syncDot   { background: #7dab6e; }
+  #syncStatus.syncing #syncDot  { background: #e8c34a; animation: pulse 1s infinite; }
+  #syncStatus.error #syncDot    { background: #e8734a; }
+  #syncStatus.offline #syncDot  { background: #aaa; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+  /* SETUP BANNER */
+  #setupBanner {
+    background: linear-gradient(135deg, #e8734a, #c96b9e);
+    color: #fff;
+    padding: 1rem 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+  #setupBanner p { font-size: 0.9rem; opacity: 0.95; }
+  #setupBanner strong { font-size: 1rem; }
+  #setupBanner a {
+    background: rgba(255,255,255,0.25);
+    border: 1px solid rgba(255,255,255,0.5);
+    color: #fff;
+    text-decoration: none;
+    padding: 0.4rem 1rem;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  #setupBanner a:hover { background: rgba(255,255,255,0.35); }
+
   /* HEADER */
   header {
     background: linear-gradient(135deg, #e8734a 0%, #c96b9e 50%, #9b7bc8 100%);
@@ -108,7 +165,6 @@
 
   /* MAIN */
   main { padding: 2rem 2.5rem; max-width: 1100px; margin: 0 auto; }
-
   .section { display: none; }
   .section.active { display: block; }
 
@@ -353,7 +409,6 @@
     outline: none;
     border-color: var(--accent1);
   }
-  .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.8rem; }
   .modal-actions { display: flex; gap: 0.8rem; justify-content: flex-end; margin-top: 1.5rem; }
   .btn-cancel {
     background: none;
@@ -402,6 +457,30 @@
 
   .due-soon { border-color: #ffd5b8; background: #fffaf7; }
 
+  /* LOADING OVERLAY */
+  #loadingOverlay {
+    position: fixed;
+    inset: 0;
+    background: var(--bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 999;
+    gap: 1rem;
+    transition: opacity 0.4s;
+  }
+  #loadingOverlay.hidden { opacity: 0; pointer-events: none; }
+  .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent1);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  #loadingOverlay p { color: var(--muted); font-size: 0.9rem; }
+
   @media (max-width: 700px) {
     main { padding: 1.2rem 1rem; }
     .week-grid { grid-template-columns: 1fr 1fr; }
@@ -413,6 +492,21 @@
 </style>
 </head>
 <body>
+
+<!-- Loading screen -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <p>Connecting to your planner…</p>
+</div>
+
+<!-- ⚠️ SETUP BANNER — remove this div after you've configured Firebase -->
+<div id="setupBanner">
+  <div>
+    <strong>⚙️ Firebase Setup Required</strong>
+    <p>Replace the Firebase config below with your own project config. <a href="#" onclick="document.getElementById('setupBanner').style.display='none';return false">Hide this</a></p>
+  </div>
+  <a href="https://console.firebase.google.com/" target="_blank">Open Firebase Console →</a>
+</div>
 
 <header>
   <h1>Alea's Planner ✨</h1>
@@ -439,7 +533,6 @@
 </nav>
 
 <main>
-
   <!-- SCHEDULE -->
   <div class="section active" id="section-schedule">
     <div class="section-header">
@@ -484,7 +577,6 @@
     </div>
     <div class="card-grid" id="testsGrid"></div>
   </div>
-
 </main>
 
 <!-- MODAL -->
@@ -499,28 +591,101 @@
   </div>
 </div>
 
+<!-- Sync status indicator -->
+<div id="syncStatus" class="syncing">
+  <div id="syncDot"></div>
+  <span id="syncText">Connecting…</span>
+</div>
+
+<!-- ===============================================================
+     FIREBASE SDK  (v9 compat — works in plain HTML, no bundler)
+     =============================================================== -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
 <script>
-// ===== DATA =====
+// ================================================================
+//  🔥 STEP 1 — REPLACE THIS CONFIG WITH YOURS FROM FIREBASE
+//  Go to: Firebase Console → Your Project → Project Settings → Web App
+// ================================================================
+const firebaseConfig = {
+  apiKey: "AIzaSyAmMrgvslkNmrOkEDfXqrDnfl1IoBkj7Zg",
+  authDomain: "alea-planner.firebaseapp.com",
+  databaseURL: "https://alea-planner-default-rtdb.firebaseio.com",
+  projectId: "alea-planner",
+  storageBucket: "alea-planner.firebasestorage.app",
+  messagingSenderId: "1089435878912",
+  appId: "1:1089435878912:web:d0a49f458a01f43c24bae5",
+  measurementId: "G-FG5Y2NZX0W"
+};
+// ================================================================
+
+// Init Firebase
+firebase.initializeApp(firebaseConfig);
+const db = firebase.database();
+const plannerRef = db.ref('aleaPlanner');
+
+// ===== SYNC STATUS =====
+function setSyncStatus(state, text) {
+  const el = document.getElementById('syncStatus');
+  el.className = state;
+  document.getElementById('syncText').textContent = text;
+}
+
+// ===== LOCAL DATA CACHE =====
 const DAYS = ['Monday','Tuesday','Wednesday','Thursday','Friday'];
 const DAY_COLORS = ['color-orange','color-blue','color-green','color-pink','color-purple'];
 
-let data = JSON.parse(localStorage.getItem('aleaPlanner') || JSON.stringify({
-  schedule: [], tasks: [], homework: [], projects: [], tests: []
-}));
+let data = { schedule: [], tasks: [], homework: [], projects: [], tests: [] };
 
-let currentModal = null;
-let editId = null;
-
-function save() {
-  localStorage.setItem('aleaPlanner', JSON.stringify(data));
+// ===== FIREBASE SAVE =====
+async function save() {
+  setSyncStatus('syncing', 'Saving…');
+  try {
+    // Convert arrays to objects keyed by id for Firebase
+    const payload = {};
+    ['schedule','tasks','homework','projects','tests'].forEach(key => {
+      payload[key] = {};
+      data[key].forEach(item => { payload[key][item.id] = item; });
+    });
+    await plannerRef.set(payload);
+    setSyncStatus('synced', 'Saved ✓');
+  } catch(e) {
+    console.error(e);
+    setSyncStatus('error', 'Save failed');
+  }
 }
+
+// ===== LISTEN FOR REALTIME UPDATES =====
+plannerRef.on('value', snapshot => {
+  const val = snapshot.val();
+  if (val) {
+    // Convert Firebase objects back to arrays
+    ['schedule','tasks','homework','projects','tests'].forEach(key => {
+      data[key] = val[key] ? Object.values(val[key]) : [];
+    });
+  } else {
+    data = { schedule: [], tasks: [], homework: [], projects: [], tests: [] };
+  }
+  setSyncStatus('synced', 'Live ✓');
+  document.getElementById('loadingOverlay').classList.add('hidden');
+  renderAll();
+}, err => {
+  console.error(err);
+  setSyncStatus('error', 'Connection error');
+  document.getElementById('loadingOverlay').innerHTML = `
+    <div style="text-align:center;padding:2rem;color:#c0392b">
+      <p style="font-size:1.1rem;margin-bottom:0.5rem">⚠️ Could not connect to Firebase</p>
+      <p style="font-size:0.85rem;color:#888">Check your Firebase config and database rules.</p>
+    </div>`;
+});
 
 // ===== DATE =====
 const today = new Date();
 document.getElementById('dateBadge').textContent = today.toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
 
 function getTodayDay() {
-  const d = today.getDay(); // 0=Sun
+  const d = today.getDay();
   if(d >= 1 && d <= 5) return DAYS[d-1];
   return null;
 }
@@ -531,7 +696,6 @@ function showTab(tab) {
   document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
   document.getElementById('section-'+tab).classList.add('active');
   document.querySelector(`[data-tab="${tab}"]`).classList.add('active');
-  renderAll();
 }
 
 // ===== RENDER =====
@@ -560,7 +724,7 @@ function renderSchedule() {
             <div class="event-chip ${DAY_COLORS[i]}" style="position:relative">
               <strong style="font-size:0.82rem">${esc(e.name)}</strong>
               <span class="event-time">${e.time}${e.endTime ? ' – '+e.endTime : ''}${e.location ? ' · '+esc(e.location) : ''}</span>
-              <button class="icon-btn del" style="position:absolute;top:4px;right:4px;opacity:0;font-size:0.7rem" 
+              <button class="icon-btn del" style="position:absolute;top:4px;right:4px;opacity:0;font-size:0.7rem"
                 onmouseenter="this.style.opacity=1" onmouseleave="this.style.opacity=0"
                 onclick="deleteItem('schedule','${e.id}')">✕</button>
             </div>
@@ -575,8 +739,7 @@ function renderSchedule() {
 function daysUntil(dateStr) {
   if(!dateStr) return null;
   const d = new Date(dateStr + 'T00:00:00');
-  const diff = Math.round((d - new Date(today.toDateString())) / 86400000);
-  return diff;
+  return Math.round((d - new Date(today.toDateString())) / 86400000);
 }
 
 function dueBadge(dateStr) {
@@ -610,7 +773,6 @@ function renderCards(type, gridId) {
     return;
   }
   const strips = ['strip-blue','strip-pink','strip-purple','strip-orange','strip-green'];
-
   grid.innerHTML = items.map((item, idx) => {
     const diff = item.dueDate ? daysUntil(item.dueDate) : null;
     const urgent = diff !== null && diff <= 2;
@@ -710,6 +872,9 @@ const FORMS = {
   }
 };
 
+let currentModal = null;
+let editId = null;
+
 function openModal(type, prefillDay) {
   currentModal = type;
   editId = null;
@@ -719,9 +884,7 @@ function openModal(type, prefillDay) {
   document.getElementById('modalOverlay').classList.add('open');
 }
 
-function openModalForDay(day) {
-  openModal('schedule', day);
-}
+function openModalForDay(day) { openModal('schedule', day); }
 
 function openEditModal(type, id) {
   currentModal = type;
@@ -741,7 +904,7 @@ function buildFormHTML(fields, prefill) {
       return `<div class="form-group">
         <label>${f.label}</label>
         <select id="f_${f.key}">
-          <option value="">Select...</option>
+          <option value="">Select…</option>
           ${(f.options||[]).map(o => `<option value="${o}" ${prefill[f.key]===o?'selected':''}>${o}</option>`).join('')}
         </select>
       </div>`;
@@ -761,8 +924,7 @@ function buildFormHTML(fields, prefill) {
 
 function closeModal() {
   document.getElementById('modalOverlay').classList.remove('open');
-  currentModal = null;
-  editId = null;
+  currentModal = null; editId = null;
 }
 
 function closeModalOutside(e) {
@@ -772,13 +934,12 @@ function closeModalOutside(e) {
 function saveModal() {
   const form = FORMS[currentModal];
   const obj = { id: editId || uid() };
-  let valid = true;
   form.fields.forEach(f => {
     const el = document.getElementById('f_'+f.key);
     obj[f.key] = el ? el.value.trim() : '';
   });
   if(!obj.name) { alert('Please enter a name.'); return; }
-  
+
   const key = currentModal === 'task' ? 'tasks' :
                currentModal === 'schedule' ? 'schedule' :
                currentModal === 'homework' ? 'homework' :
@@ -790,9 +951,8 @@ function saveModal() {
   } else {
     data[key].push(obj);
   }
-  save();
   closeModal();
-  renderAll();
+  save(); // Firebase save — re-render triggered by the listener
 }
 
 // ===== ACTIONS =====
@@ -800,25 +960,18 @@ function deleteItem(type, id) {
   if(!confirm('Delete this item?')) return;
   data[type] = data[type].filter(i => i.id !== id);
   save();
-  renderAll();
 }
 
 function toggleTask(id) {
   const t = data.tasks.find(i => i.id === id);
-  if(t) { t.done = !t.done; save(); renderTasks(); }
+  if(t) { t.done = !t.done; save(); }
 }
 
-function uid() {
-  return Math.random().toString(36).slice(2,10);
-}
-
+function uid() { return Math.random().toString(36).slice(2,10); }
 function esc(str) {
   if(!str) return '';
   return String(str).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
-// ===== INIT =====
-renderAll();
 </script>
 </body>
 </html>
